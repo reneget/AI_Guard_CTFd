@@ -1,0 +1,74 @@
+{% extends "admin/base.html" %}
+
+{% block stylesheets %}
+<style>
+	.aig-risk { display: flex; align-items: center; min-width: 160px; }
+	.aig-progress { position: relative; flex: 1; height: 10px; margin-right: 10px; overflow: visible; }
+	.aig-threshold { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #343a40; }
+	.aig-score { min-width: 2.5em; text-align: right; }
+	.aig-stat { border-left: 4px solid #6c757d; }
+	.aig-stat.aig-danger { border-left-color: #dc3545; }
+	.aig-stat.aig-warning { border-left-color: #ffc107; }
+	.aig-stat.aig-info { border-left-color: #17a2b8; }
+	.aig-stat .aig-stat-value { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+	.aig-summary { max-width: 520px; }
+	.aig-table td { vertical-align: middle; }
+	.aig-big-score { font-size: 3.5rem; font-weight: 700; line-height: 1; }
+	.aig-inline-form { display: inline; }
+	.aig-pre { white-space: pre-wrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="jumbotron">
+	<div class="container">
+		<h1>AI Guard</h1>
+		<p class="text-muted mb-0">
+			Detection of AI-automated challenge solving
+			· hiding threshold: <b>{{ '%.1f' | format(threshold) }}</b> / 10
+		</p>
+	</div>
+</div>
+
+<div class="container">
+	<ul class="nav nav-tabs mb-4">
+		<li class="nav-item">
+			<a class="nav-link {% if tab == 'board' %}active{% endif %}" href="{{ url_for('ai_guard.board') }}">
+				<i class="fas fa-chart-bar"></i> {{ 'Team' if teams_mode else 'User' }} risk
+			</a>
+		</li>
+		<li class="nav-item">
+			<a class="nav-link {% if tab == 'events' %}active{% endif %}" href="{{ url_for('ai_guard.events') }}">
+				<i class="fas fa-bell"></i> Alerts
+				{% if unacked_count %}<span class="badge badge-pill badge-danger">{{ unacked_count }}</span>{% endif %}
+			</a>
+		</li>
+		<li class="nav-item">
+			<a class="nav-link {% if tab == 'honeypots' %}active{% endif %}" href="{{ url_for('ai_guard.honeypots') }}">
+				<i class="fas fa-flag"></i> Honeypot flags
+			</a>
+		</li>
+		<li class="nav-item">
+			<a class="nav-link {% if tab == 'shame' %}active{% endif %}" href="{{ url_for('ai_guard.shame_admin') }}">
+				<i class="fas fa-user-slash"></i> Wall of shame
+				{% if shame_count %}<span class="badge badge-pill badge-dark">{{ shame_count }}</span>{% endif %}
+			</a>
+		</li>
+		<li class="nav-item">
+			<a class="nav-link {% if tab == 'settings' %}active{% endif %}" href="{{ url_for('ai_guard.settings') }}">
+				<i class="fas fa-cog"></i> Settings
+			</a>
+		</li>
+	</ul>
+
+	{% with messages = get_flashed_messages(with_categories=true) %}
+		{% for category, message in messages %}
+			<div class="alert alert-{{ category if category in ('success', 'danger', 'warning', 'info') else 'info' }}" role="alert">
+				{{ message }}
+			</div>
+		{% endfor %}
+	{% endwith %}
+
+	{% block aig_content %}{% endblock %}
+</div>
+{% endblock %}

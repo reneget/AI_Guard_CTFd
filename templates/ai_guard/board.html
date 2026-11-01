@@ -1,0 +1,126 @@
+{% extends "ai_guard/layout.html" %}
+{% from "ai_guard/macros.html" import risk_bar with context %}
+
+{% block aig_content %}
+{% if not settings.enabled %}
+	<div class="alert alert-warning">
+		<i class="fas fa-exclamation-triangle"></i>
+		Detection is disabled — new flag submissions are not analyzed.
+		<a href="{{ url_for('ai_guard.settings') }}">Enable it in the settings</a>.
+	</div>
+{% elif not settings.auto_hide %}
+	<div class="alert alert-info">
+		<i class="fas fa-info-circle"></i>
+		Auto-hide is disabled: when the threshold is reached, administrators get an alert but the
+		{{ 'team' if teams_mode else 'user' }} stays on the scoreboard.
+	</div>
+{% endif %}
+
+<div class="row mb-4">
+	<div class="col-md-3 mb-2">
+		<div class="card aig-stat aig-warning"><div class="card-body py-3">
+			<div class="aig-stat-value">{{ stats.risky }}</div>
+			<small class="text-muted">with a non-zero risk</small>
+		</div></div>
+	</div>
+	<div class="col-md-3 mb-2">
+		<div class="card aig-stat aig-danger"><div class="card-body py-3">
+			<div class="aig-stat-value">{{ stats.over }}</div>
+			<small class="text-muted">at or above the threshold</small>
+		</div></div>
+	</div>
+	<div class="col-md-3 mb-2">
+		<div class="card aig-stat"><div class="card-body py-3">
+			<div class="aig-stat-value">{{ stats.auto_hidden }}</div>
+			<small class="text-muted">hidden by AI Guard</small>
+		</div></div>
+	</div>
+	<div class="col-md-3 mb-2">
+		<div class="card aig-stat aig-info"><div class="card-body py-3">
+			<div class="aig-stat-value">{{ stats.honeypots }}</div>
+			<small class="text-muted"><a href="{{ url_for('ai_guard.honeypots') }}">honeypot flags</a></small>
+		</div></div>
+	</div>
+</div>
+
+{% if rows %}
+<table class="table table-striped border aig-table">
+	<thead>
+		<tr>
+			<th class="text-center">#</th>
+			<th>{{ noun }}</th>
+			<th>AI risk score</th>
+			<th class="text-center">Status</th>
+			<th class="text-center">Signals</th>
+			<th>Last signal</th>
+			<th class="text-right">Actions</th>
+		</tr>
+	</thead>
+	<tbody>
+	{% for row in rows %}
+		{% set s = row.state %}
+		{% set a = row.account %}
+		<tr>
+			<td class="text-center text-muted">{{ loop.index }}</td>
+			<td>
+				<a href="{{ url_for('ai_guard.account_detail', account_id=a.id) }}"><b>{{ a.name | truncate(32) }}</b></a>
+				<a href="{{ admin_url(a.id) }}" class="text-muted ml-1" title="Open in CTFd"><i class="fas fa-external-link-alt"></i></a>
+			</td>
+			<td>{{ risk_bar(s.score, threshold) }}</td>
+			<td class="text-center">
+				{% if a.id in shamed %}
+					<span class="badge badge-dark">wall of shame</span>
+				{% elif s.auto_hidden and a.hidden %}
+					<span class="badge badge-danger">hidden by AI Guard</span>
+				{% elif a.hidden %}
+					<span class="badge badge-secondary">hidden</span>
+				{% else %}
+					<span class="badge badge-light border">on the scoreboard</span>
+				{% endif %}
+				{% if s.whitelisted %}<span class="badge badge-info">trusted</span>{% endif %}
+			</td>
+			<td class="text-center">{{ row.signals }}</td>
+			<td>
+				{% if s.last_event_at %}
+					<small><span data-time="{{ s.last_event_at | isoformat }}" data-time-format="MMM D, HH:mm:ss"></span></small>
+				{% else %}<small class="text-muted">—</small>{% endif %}
+			</td>
+			<td class="text-right text-nowrap">
+				{% if a.hidden and a.id not in shamed %}
+				<form method="POST" class="aig-inline-form" action="{{ url_for('ai_guard.account_action', account_id=a.id) }}"
+					onsubmit="return confirm('Restore to the scoreboard and reset the risk score?')">
+					<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+					<input type="hidden" name="action" value="unhide">
+					<input type="hidden" name="reset" value="y">
+					<input type="hidden" name="next" value="{{ url_for('ai_guard.board') }}">
+					<button class="btn btn-sm btn-outline-success" title="Restore to the scoreboard and reset the risk score"><i class="fas fa-eye"></i></button>
+				</form>
+				{% endif %}
+				{% if s.score > 0 %}
+				<form method="POST" class="aig-inline-form" action="{{ url_for('ai_guard.account_action', account_id=a.id) }}"
+					onsubmit="return confirm('Reset the risk score?')">
+					<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+					<input type="hidden" name="action" value="reset">
+					<input type="hidden" name="next" value="{{ url_for('ai_guard.board') }}">
+					<button class="btn btn-sm btn-outline-secondary" title="Reset the risk score"><i class="fas fa-undo"></i></button>
+				</form>
+				{% endif %}
+				<a class="btn btn-sm btn-outline-primary" href="{{ url_for('ai_guard.account_detail', account_id=a.id) }}" title="Details"><i class="fas fa-search"></i></a>
+			</td>
+		</tr>
+	{% endfor %}
+	</tbody>
+</table>
+{% else %}
+	<div class="text-center text-muted py-5">
+		<i class="fas fa-shield-alt fa-3x mb-3"></i>
+		<p>No suspicious activity detected yet.</p>
+	</div>
+{% endif %}
+
+<p class="text-muted small">
+	The score of every {{ 'team' if teams_mode else 'user' }} is also shown in the "AI Risk" column on the
+	<a href="{{ url_for('admin.teams_listing') if teams_mode else url_for('admin.users_listing') }}">{{ 'Teams' if teams_mode else 'Users' }}</a> page.
+	The vertical mark on the bar is the hiding threshold.
+</p>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+{{ super() }}
+<style>
+	.aig-wall-text { white-space: pre-wrap; max-width: 760px; margin: 0 auto 2rem; }
+	.aig-wall-card { border-left: 5px solid #dc3545; }
+	.aig-wall-name { font-size: 1.35rem; font-weight: 700; word-break: break-word; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="jumbotron">
+	<div class="container">
+		<h1>{{ title }}</h1>
+	</div>
+</div>
+<div class="container">
+	{% if not enabled %}
+		<div class="alert alert-warning text-center" role="alert">
+			This page is not published: only administrators can see it now.
+		</div>
+	{% endif %}
+
+	<p class="aig-wall-text text-center text-muted">{{ text }}</p>
+
+	{% if rows %}
+	<div class="row">
+		{% for shame, account in rows %}
+		<div class="col-md-6 col-lg-4 mb-4">
+			<div class="card h-100 aig-wall-card">
+				<div class="card-body">
+					<div class="aig-wall-name">{{ account.name }}</div>
+					<small class="text-muted">{{ shame.date.strftime('%Y-%m-%d %H:%M') }} UTC</small>
+					{% if shame.comment %}
+						<p class="card-text mt-2 mb-0">{{ shame.comment }}</p>
+					{% endif %}
+				</div>
+			</div>
+		</div>
+		{% endfor %}
+	</div>
+	{% else %}
+		<p class="text-center text-muted py-5">Nobody here yet</p>
+	{% endif %}
+</div>
+{% endblock %}

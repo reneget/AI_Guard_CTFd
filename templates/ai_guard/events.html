@@ -1,0 +1,75 @@
+{% extends "ai_guard/layout.html" %}
+{% from "ai_guard/macros.html" import kind_badge with context %}
+
+{% block aig_content %}
+<div class="d-flex flex-wrap align-items-center mb-3">
+	<div class="btn-group mr-3 mb-2">
+		<a class="btn btn-sm {{ 'btn-primary' if not only_new else 'btn-outline-primary' }}" href="{{ url_for('ai_guard.events', kind=kind) }}">All</a>
+		<a class="btn btn-sm {{ 'btn-primary' if only_new else 'btn-outline-primary' }}" href="{{ url_for('ai_guard.events', filter='new', kind=kind) }}">
+			New {% if unacked_count %}<span class="badge badge-light">{{ unacked_count }}</span>{% endif %}
+		</a>
+	</div>
+	<form method="GET" class="form-inline mr-auto mb-2">
+		{% if only_new %}<input type="hidden" name="filter" value="new">{% endif %}
+		<select name="kind" class="form-control form-control-sm custom-select" onchange="this.form.submit()">
+			<option value="">all types</option>
+			{% for k, l in all_kinds.items() %}
+				<option value="{{ k }}" {% if k == kind %}selected{% endif %}>{{ l }}</option>
+			{% endfor %}
+		</select>
+	</form>
+	{% if unacked_count %}
+	<form method="POST" class="mb-2" action="{{ url_for('ai_guard.events_ack') }}">
+		<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+		<input type="hidden" name="next" value="{{ request.full_path }}">
+		<button class="btn btn-sm btn-outline-success"><i class="fas fa-check-double"></i> Mark all as read</button>
+	</form>
+	{% endif %}
+</div>
+
+{% if pagination.items %}
+<table class="table table-sm table-striped border aig-table">
+	<thead>
+		<tr>
+			<th></th>
+			<th>Time</th>
+			<th>{{ noun }}</th>
+			<th>Type</th>
+			<th class="text-center">Weight</th>
+			<th class="text-center">Risk</th>
+			<th>Details</th>
+		</tr>
+	</thead>
+	<tbody>
+	{% for e in pagination.items %}
+		{% set aid = event_account_id(e) %}
+		<tr class="{{ 'table-danger' if e.kind == 'auto_hide' else '' }}">
+			<td class="text-center">{% if not e.acknowledged %}<i class="fas fa-circle text-danger small" title="new"></i>{% endif %}</td>
+			<td class="text-nowrap"><small><span data-time="{{ e.date | isoformat }}" data-time-format="MMM D, HH:mm:ss"></span></small></td>
+			<td><a href="{{ url_for('ai_guard.account_detail', account_id=aid) }}">{{ names.get(aid, '#' ~ aid) | truncate(28) }}</a></td>
+			<td class="text-nowrap">{{ kind_badge(e.kind) }}</td>
+			<td class="text-center">{% if e.weight %}{{ '%+.1f' | format(e.weight) }}{% endif %}</td>
+			<td class="text-center">{{ '%.1f' | format(e.score_after) }}</td>
+			<td class="aig-summary">{{ e.details_dict.summary }}</td>
+		</tr>
+	{% endfor %}
+	</tbody>
+</table>
+
+{% if pagination.pages > 1 %}
+<nav>
+	<ul class="pagination pagination-sm justify-content-center">
+		{% if pagination.has_prev %}
+			<li class="page-item"><a class="page-link" href="{{ url_for('ai_guard.events', page=pagination.prev_num, filter='new' if only_new else None, kind=kind) }}">&laquo;</a></li>
+		{% endif %}
+		<li class="page-item disabled"><span class="page-link">{{ pagination.page }} / {{ pagination.pages }}</span></li>
+		{% if pagination.has_next %}
+			<li class="page-item"><a class="page-link" href="{{ url_for('ai_guard.events', page=pagination.next_num, filter='new' if only_new else None, kind=kind) }}">&raquo;</a></li>
+		{% endif %}
+	</ul>
+</nav>
+{% endif %}
+{% else %}
+	<p class="text-muted text-center py-5">No events.</p>
+{% endif %}
+{% endblock %}

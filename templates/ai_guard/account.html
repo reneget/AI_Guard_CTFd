@@ -1,0 +1,170 @@
+{% extends "ai_guard/layout.html" %}
+{% from "ai_guard/macros.html" import risk_bar, kind_badge with context %}
+
+{% block aig_content %}
+{% set score = state.score if state else 0 %}
+<div class="mb-3">
+	<a href="{{ url_for('ai_guard.board') }}"><i class="fas fa-arrow-left"></i> Back to the list</a>
+</div>
+
+<div class="row mb-4">
+	<div class="col-md-5">
+		<h2 class="mb-1">{{ account.name }}</h2>
+		<p class="text-muted mb-2">
+			{{ noun }} #{{ account.id }} ·
+			<a href="{{ admin_url(account.id) }}">open in CTFd <i class="fas fa-external-link-alt"></i></a>
+		</p>
+		<div class="mb-2">
+			{% if shame %}
+				<span class="badge badge-dark">on the wall of shame — flag submission disabled</span>
+				<small class="text-muted">since <span data-time="{{ shame.date | isoformat }}" data-time-format="MMM D, YYYY HH:mm:ss"></span></small>
+			{% elif state and state.auto_hidden and account.hidden %}
+				<span class="badge badge-danger">hidden by AI Guard</span>
+				{% if state.hidden_at %}<small class="text-muted">since <span data-time="{{ state.hidden_at | isoformat }}" data-time-format="MMM D, YYYY HH:mm:ss"></span></small>{% endif %}
+			{% elif account.hidden %}
+				<span class="badge badge-secondary">hidden</span>
+			{% else %}
+				<span class="badge badge-light border">on the scoreboard</span>
+			{% endif %}
+			{% if account.banned %}<span class="badge badge-dark">banned</span>{% endif %}
+			{% if state and state.whitelisted %}<span class="badge badge-info">trusted — signals are ignored</span>{% endif %}
+		</div>
+		<div class="aig-big-score {{ 'text-danger' if score >= threshold else ('text-warning' if score >= threshold / 2 else 'text-success') }}">
+			{{ '%.1f' | format(score) }}<small class="text-muted h4"> / 10</small>
+		</div>
+		<div class="mt-2" style="max-width: 360px">{{ risk_bar(score, threshold) }}</div>
+	</div>
+
+	<div class="col-md-7">
+		<div class="card">
+			<div class="card-body">
+				<h5 class="card-title">Actions</h5>
+
+				<form method="POST" class="form-inline mb-3" action="{{ url_for('ai_guard.account_action', account_id=account.id) }}">
+					<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+					<input type="hidden" name="action" value="set">
+					<label class="mr-2" for="aig-score">Score</label>
+					<input id="aig-score" type="number" class="form-control form-control-sm mr-2" name="score" min="0" max="10" step="0.1" value="{{ '%.1f' | format(score) }}" style="width: 90px">
+					<input type="text" class="form-control form-control-sm mr-2" name="note" placeholder="comment (optional)" style="width: 220px">
+					<button class="btn btn-sm btn-primary">Set</button>
+				</form>
+
+				<div>
+				{% if account.hidden and not shame %}
+					<form method="POST" class="aig-inline-form" action="{{ url_for('ai_guard.account_action', account_id=account.id) }}">
+						<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+						<input type="hidden" name="action" value="unhide">
+						<button class="btn btn-sm btn-success"><i class="fas fa-eye"></i> Restore to the scoreboard</button>
+						<label class="ml-1 mr-3 small"><input type="checkbox" name="reset" value="y" checked> and reset the risk</label>
+					</form>
+				{% endif %}
+				{% if score > 0 %}
+					<form method="POST" class="aig-inline-form" action="{{ url_for('ai_guard.account_action', account_id=account.id) }}"
+						onsubmit="return confirm('Reset the risk score?')">
+						<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+						<input type="hidden" name="action" value="reset">
+						<button class="btn btn-sm btn-outline-secondary"><i class="fas fa-undo"></i> Reset risk</button>
+					</form>
+				{% endif %}
+					<form method="POST" class="aig-inline-form" action="{{ url_for('ai_guard.account_action', account_id=account.id) }}">
+						<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+					{% if state and state.whitelisted %}
+						<input type="hidden" name="action" value="unwhitelist">
+						<button class="btn btn-sm btn-outline-info"><i class="fas fa-user-times"></i> Stop trusting</button>
+					{% else %}
+						<input type="hidden" name="action" value="whitelist">
+						<button class="btn btn-sm btn-outline-info" title="Signals for this account will no longer be counted"><i class="fas fa-user-check"></i> Trust</button>
+					{% endif %}
+					</form>
+				</div>
+				<small class="text-muted d-block mt-2">
+					After handling the ticket, restore the account with a risk reset or mark it as trusted —
+					otherwise the next signal hides it again.
+				</small>
+
+				<hr>
+				{% if shame %}
+					<h6 class="mb-2"><i class="fas fa-user-slash"></i> On the wall of shame</h6>
+					{% if shame.comment %}<p class="small mb-2">Public comment: "{{ shame.comment }}"</p>{% endif %}
+					<form method="POST" action="{{ url_for('ai_guard.account_action', account_id=account.id) }}"
+						onsubmit="return confirm('Remove from the wall of shame? Flag submission will be allowed again; the account stays hidden from the scoreboard.')">
+						<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+						<input type="hidden" name="action" value="unshame">
+						<button class="btn btn-sm btn-outline-dark"><i class="fas fa-user-check"></i> Remove from the wall of shame</button>
+					</form>
+				{% else %}
+					<h6 class="mb-2"><i class="fas fa-user-slash"></i> Wall of shame</h6>
+					<form method="POST" action="{{ url_for('ai_guard.account_action', account_id=account.id) }}"
+						onsubmit="return confirm('Put on the wall of shame? The account will be hidden from the scoreboard and flag submission will be disabled.')">
+						<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+						<input type="hidden" name="action" value="shame">
+						<input type="text" class="form-control form-control-sm mb-2" name="comment" maxlength="500"
+							placeholder="Public comment for the wall of shame (optional)">
+						<button class="btn btn-sm btn-dark"><i class="fas fa-user-slash"></i> Shame</button>
+					</form>
+					<small class="text-muted d-block mt-1">
+						An organizers' decision: the account is hidden from the scoreboard, can no longer submit flags
+						and is listed on the <a href="{{ url_for('ai_guard.wall_of_shame') }}" target="_blank">wall of shame</a> page.
+					</small>
+				{% endif %}
+			</div>
+		</div>
+	</div>
+</div>
+
+<h4>History</h4>
+{% if events %}
+<table class="table table-sm table-striped border aig-table">
+	<thead>
+		<tr>
+			<th>Time</th>
+			<th>Type</th>
+			<th class="text-center">Weight</th>
+			<th class="text-center">Risk</th>
+			<th>Details</th>
+		</tr>
+	</thead>
+	<tbody>
+	{% for e in events %}
+		<tr class="{{ 'table-danger' if e.kind == 'auto_hide' else '' }}">
+			<td class="text-nowrap"><small><span data-time="{{ e.date | isoformat }}" data-time-format="MMM D, HH:mm:ss"></span></small></td>
+			<td class="text-nowrap">{{ kind_badge(e.kind) }}</td>
+			<td class="text-center">{% if e.weight %}{{ '%+.1f' | format(e.weight) }}{% endif %}</td>
+			<td class="text-center">{{ '%.1f' | format(e.score_after) }}</td>
+			<td class="aig-summary">
+				{{ e.details_dict.summary }}
+				{% if e.kind == 'honeypot' and e.details_dict.submission %}
+					<br><code>{{ e.details_dict.submission }}</code>
+				{% endif %}
+				{% if e.kind == 'burst' and e.details_dict.user_ids and teams_mode %}
+					<br><small class="text-muted">
+						{% for uid in e.details_dict.user_ids %}{{ members.get(uid, '#' ~ uid) }}{% if not loop.last %}, {% endif %}{% endfor %}
+					</small>
+				{% endif %}
+			</td>
+		</tr>
+	{% endfor %}
+	</tbody>
+</table>
+{% else %}
+	<p class="text-muted">No events.</p>
+{% endif %}
+
+{% if notices %}
+<h4 class="mt-4">Notices sent to the {{ 'team' if teams_mode else 'user' }}</h4>
+<table class="table table-sm border">
+	<thead><tr><th>Time</th><th>Text</th><th>Read by</th></tr></thead>
+	<tbody>
+	{% for n in notices %}
+		<tr>
+			<td class="text-nowrap"><small><span data-time="{{ n.date | isoformat }}" data-time-format="MMM D, HH:mm:ss"></span></small></td>
+			<td><b>{{ n.title }}</b><div class="aig-pre small text-muted">{{ n.content }}</div></td>
+			<td>
+				{% for r in reads.get(n.id, []) %}<span class="badge badge-light border">{{ members.get(r.user_id, '#' ~ r.user_id) }}</span> {% else %}<small class="text-muted">nobody yet</small>{% endfor %}
+			</td>
+		</tr>
+	{% endfor %}
+	</tbody>
+</table>
+{% endif %}
+{% endblock %}

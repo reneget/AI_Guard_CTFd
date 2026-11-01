@@ -1,0 +1,179 @@
+{% extends "ai_guard/layout.html" %}
+
+{% macro number(name, title, help, step="1", min="0", max=None) -%}
+	<div class="form-group col-md-4">
+		<label for="aig-{{ name }}">{{ title }}</label>
+		<input id="aig-{{ name }}" type="number" class="form-control" name="{{ name }}" value="{{ settings[name] }}"
+			step="{{ step }}" min="{{ min }}" {% if max %}max="{{ max }}"{% endif %} required>
+		{% if help %}<small class="form-text text-muted">{{ help }}</small>{% endif %}
+	</div>
+{%- endmacro %}
+
+{% macro checkbox(name, title, help) -%}
+	<div class="form-check mb-2">
+		<input id="aig-{{ name }}" class="form-check-input" type="checkbox" name="{{ name }}" value="y" {% if settings[name] %}checked{% endif %}>
+		<label class="form-check-label" for="aig-{{ name }}">{{ title }}</label>
+		{% if help %}<small class="form-text text-muted mt-0">{{ help }}</small>{% endif %}
+	</div>
+{%- endmacro %}
+
+{% block aig_content %}
+<form method="POST" action="{{ url_for('ai_guard.settings') }}">
+	<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+
+	<div class="card mb-4">
+		<div class="card-body">
+			<h5 class="card-title">General</h5>
+			{{ checkbox("enabled", "Analyze flag submissions", "When disabled, new submissions do not affect the score.") }}
+			{{ checkbox("auto_hide", "Automatically hide from the scoreboard when the threshold is reached", "When disabled, administrators only get alerts (observation mode).") }}
+			<div class="form-row mt-3">
+				{{ number("threshold", "Hiding threshold (0–10)", "The score at which an account is hidden.", step="0.1", min="0.5", max="10") }}
+			</div>
+		</div>
+	</div>
+
+	<div class="card mb-4">
+		<div class="card-body">
+			<h5 class="card-title">Signal: mass (parallel) solving</h5>
+			<p class="text-muted small">
+				Triggers when a {{ 'team' if teams_mode else 'user' }} solves at least N challenges within the time window
+				({{ 'solves of all team members count' if teams_mode else 'all solves of the user count' }}). Solves that already
+				triggered the signal are not counted again.
+			</p>
+			<div class="form-row">
+				{{ number("burst_count", "N — number of challenges", "", min="2") }}
+				{{ number("burst_window", "Window, seconds", "", min="10") }}
+				{{ number("burst_weight", "Signal weight", "0 disables the signal.", step="0.1", max="10") }}
+			</div>
+		</div>
+	</div>
+
+	<div class="card mb-4">
+		<div class="card-body">
+			<h5 class="card-title">Signal: short interval between flags of one participant</h5>
+			<p class="text-muted small">
+				Time between two correct submissions of the same participant. Below the critical interval the
+				critical weight applies, otherwise below the threshold the regular weight applies.
+			</p>
+			<div class="form-row">
+				{{ number("delta_threshold", "Interval threshold, seconds", "", min="1") }}
+				{{ number("delta_weight", "Weight", "0 disables it.", step="0.1", max="10") }}
+			</div>
+			<div class="form-row">
+				{{ number("delta_critical", "Critical interval, seconds", "", min="0") }}
+				{{ number("delta_critical_weight", "Critical interval weight", "0 disables it.", step="0.1", max="10") }}
+			</div>
+		</div>
+	</div>
+
+	<div class="card mb-4">
+		<div class="card-body">
+			<h5 class="card-title">Signal: honeypot flag</h5>
+			<div class="form-row">
+				{{ number("honeypot_weight", "Honeypot flag weight", "Every honeypot counts once per account. A weight ≥ the threshold hides the account at once.", step="0.1", max="10") }}
+			</div>
+			<a href="{{ url_for('ai_guard.honeypots') }}">Manage the honeypot flags →</a>
+		</div>
+	</div>
+
+	<div class="card mb-4">
+		<div class="card-body">
+			<h5 class="card-title">Signal: quick solve after first opening a challenge</h5>
+			<p class="text-muted small">
+				Time from the first opening of a challenge by {{ 'any team member' if teams_mode else 'the user' }}
+				until it is solved. Below the critical interval the critical weight applies, otherwise below the
+				threshold the regular weight applies. Openings are recorded even while the analysis is disabled,
+				so install the plugin before the competition starts.
+			</p>
+			<div class="form-row">
+				{{ number("view_threshold", "Threshold, seconds", "", min="1") }}
+				{{ number("view_weight", "Weight", "0 disables it.", step="0.1", max="10") }}
+			</div>
+			<div class="form-row">
+				{{ number("view_critical", "Critical interval, seconds", "", min="0") }}
+				{{ number("view_critical_weight", "Critical interval weight", "0 disables it.", step="0.1", max="10") }}
+				{{ number("view_min_value", "Minimum challenge value, points", "Cheaper challenges (sanity checks, warm-ups) are skipped. Dynamic challenges use their initial value.", min="0") }}
+			</div>
+		</div>
+	</div>
+
+	<div class="card mb-4">
+		<div class="card-body">
+			<h5 class="card-title">Signal: flag submitted with an API token</h5>
+			<p class="text-muted small">
+				A correct flag was sent with an <code>Authorization</code> header (a CTFd access token) instead of
+				from the browser. Counted for every challenge solved this way; the client's User-Agent is stored with the event.
+			</p>
+			<div class="form-row">
+				{{ number("token_weight", "Weight", "0 disables it.", step="0.1", max="10") }}
+			</div>
+		</div>
+	</div>
+
+	<div class="card mb-4">
+		<div class="card-body">
+			<h5 class="card-title">Notice to the {{ 'team' if teams_mode else 'user' }}</h5>
+			<p class="text-muted small">
+				Shown to every member of an account hidden by AI Guard: the title and text in a popup, the banner on top of
+				every page while the account stays hidden. Leave a field empty to use the default text (shown in grey).
+			</p>
+			<div class="form-group">
+				<label for="aig-notice_title">Title</label>
+				<input id="aig-notice_title" type="text" class="form-control" name="notice_title" value="{{ settings.notice_title }}" placeholder="{{ defaults.notice_title }}">
+			</div>
+			<div class="form-group">
+				<label for="aig-notice_text">Text</label>
+				<textarea id="aig-notice_text" class="form-control" rows="4" name="notice_text" placeholder="{{ defaults.notice_text }}">{{ settings.notice_text }}</textarea>
+				<small class="form-text text-muted">Changes apply to accounts hidden after saving.</small>
+			</div>
+			<div class="form-group">
+				<label for="aig-notice_banner">Banner</label>
+				<input id="aig-notice_banner" type="text" class="form-control" name="notice_banner" value="{{ settings.notice_banner }}" placeholder="{{ defaults.notice_banner }}">
+			</div>
+			<div class="form-group">
+				<label for="aig-ticket_url">Ticket link</label>
+				<input id="aig-ticket_url" type="url" class="form-control" name="ticket_url" value="{{ settings.ticket_url }}" placeholder="https://discord.gg/... or https://t.me/...">
+				<small class="form-text text-muted">If set, the notice gets an "Open a ticket" button.</small>
+			</div>
+		</div>
+	</div>
+
+	<div class="card mb-4">
+		<div class="card-body">
+			<h5 class="card-title">Admin alerts</h5>
+			<p class="text-muted small">
+				Alerts always work inside the admin panel: popups on any admin page, a counter on the "AI Guard"
+				menu item and the "Alerts" tab. Additional external channels can be configured below.
+			</p>
+			<div class="form-group">
+				<label for="aig-webhook_url">Webhook URL (Discord / Slack / Mattermost)</label>
+				<input id="aig-webhook_url" type="url" class="form-control" name="webhook_url" value="{{ settings.webhook_url }}" autocomplete="off">
+			</div>
+			<div class="form-row">
+				<div class="form-group col-md-6">
+					<label for="aig-telegram_token">Telegram: bot token</label>
+					<input id="aig-telegram_token" type="password" class="form-control" name="telegram_token" value="{{ settings.telegram_token }}" autocomplete="off">
+				</div>
+				<div class="form-group col-md-6">
+					<label for="aig-telegram_chat_id">Telegram: chat_id</label>
+					<input id="aig-telegram_chat_id" type="text" class="form-control" name="telegram_chat_id" value="{{ settings.telegram_chat_id }}" placeholder="-1001234567890">
+				</div>
+			</div>
+			<div class="form-group">
+				<label for="aig-admin_emails">Administrator e-mails (comma-separated)</label>
+				<input id="aig-admin_emails" type="text" class="form-control" name="admin_emails" value="{{ settings.admin_emails }}">
+				<small class="form-text text-muted">Uses the CTFd mail settings (Config → Email).</small>
+			</div>
+			{{ checkbox("external_only_hide", "External channels: only when an account is hidden", "Otherwise every suspicious event is sent (while the account is still on the scoreboard).") }}
+		</div>
+	</div>
+
+	<button class="btn btn-primary mb-3"><i class="fas fa-save"></i> Save</button>
+</form>
+
+<form method="POST" action="{{ url_for('ai_guard.settings_test') }}" class="mb-5">
+	<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+	<button class="btn btn-outline-secondary btn-sm"><i class="fas fa-paper-plane"></i> Send a test alert to the external channels</button>
+	<small class="text-muted ml-2">(uses the saved settings)</small>
+</form>
+{% endblock %}

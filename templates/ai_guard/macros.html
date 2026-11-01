@@ -1,0 +1,23 @@
+{% macro risk_bar(score, threshold) -%}
+	{% set pct = (score / 10 * 100) | round(1) %}
+	{% if score >= threshold %}{% set cls = "bg-danger" %}
+	{% elif score >= threshold / 2 %}{% set cls = "bg-warning" %}
+	{% else %}{% set cls = "bg-success" %}{% endif %}
+	<div class="aig-risk" title="{{ '%.1f' | format(score) }} / 10">
+		<div class="progress aig-progress">
+			<div class="progress-bar {{ cls }}" role="progressbar" style="width: {{ pct }}%"></div>
+			<div class="aig-threshold" style="left: {{ (threshold / 10 * 100) | round(1) }}%"></div>
+		</div>
+		<b class="aig-score">{{ '%.1f' | format(score) }}</b>
+	</div>
+{%- endmacro %}
+
+{% macro kind_badge(kind) -%}
+	{% if kind == "honeypot" %}{% set cls = "badge-danger" %}
+	{% elif kind == "burst" %}{% set cls = "badge-warning" %}
+	{% elif kind in ("fast_delta", "quick_solve") %}{% set cls = "badge-info" %}
+	{% elif kind == "api_token" %}{% set cls = "badge-primary" %}
+	{% elif kind in ("auto_hide", "shame") %}{% set cls = "badge-dark" %}
+	{% else %}{% set cls = "badge-secondary" %}{% endif %}
+	<span class="badge {{ cls }}">{{ label(kind) }}</span>
+{%- endmacro %}

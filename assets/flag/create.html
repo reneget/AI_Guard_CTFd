@@ -1,0 +1,16 @@
+<label>
+	Honeypot (AI Guard)<br>
+	<small>A valid solution of the challenge; submitting it raises the account's AI risk score</small>
+</label>
+<div class="form-group">
+	<input type="text" class="form-control" name="content" value="{{ content }}">
+</div>
+<div class="form-group">
+	<select class="form-control custom-select col-md-6" name="data">
+		<option value="">Exact match</option>
+		<option value="case_insensitive">Exact match, case-insensitive</option>
+		<option value="regex">Regular expression</option>
+		<option value="regex_case_insensitive">Regular expression, case-insensitive</option>
+	</select>
+</div>
+<input type="hidden" name="type" value="honeypot">

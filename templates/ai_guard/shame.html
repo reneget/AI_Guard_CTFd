@@ -1,0 +1,115 @@
+{% extends "ai_guard/layout.html" %}
+
+{% block aig_content %}
+{% set public_url = url_for('ai_guard.wall_of_shame', _external=True) %}
+<div class="row">
+	<div class="col-md-5 mb-4">
+		<div class="card mb-3">
+			<div class="card-body">
+				<h5 class="card-title">Public page</h5>
+				{% if settings.shame_enabled %}
+					<p><span class="badge badge-success">published</span> — available to everyone at:</p>
+				{% else %}
+					<p><span class="badge badge-secondary">hidden</span> — only administrators can see it now.
+					Once published, it is available to everyone at:</p>
+				{% endif %}
+				<div class="input-group input-group-sm mb-3">
+					<input id="aig-shame-url" type="text" class="form-control" value="{{ public_url }}" readonly>
+					<div class="input-group-append">
+						<a class="btn btn-outline-secondary" href="{{ url_for('ai_guard.wall_of_shame') }}" target="_blank" title="Open"><i class="fas fa-external-link-alt"></i></a>
+					</div>
+				</div>
+				<p class="small text-muted">The link is not added to the CTFd menu — share it with the participants yourself.</p>
+				<form method="POST" action="{{ url_for('ai_guard.shame_settings') }}">
+					<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+					{% if settings.shame_enabled %}
+						<input type="hidden" name="action" value="disable">
+						<button class="btn btn-outline-secondary"><i class="fas fa-eye-slash"></i> Hide the page</button>
+					{% else %}
+						<input type="hidden" name="action" value="enable">
+						<button class="btn btn-dark"><i class="fas fa-bullhorn"></i> Publish the page</button>
+					{% endif %}
+				</form>
+			</div>
+		</div>
+
+		<div class="card">
+			<div class="card-body">
+				<h5 class="card-title">Texts</h5>
+				<p class="small text-muted">Leave a field empty to use the default text (shown in grey).</p>
+				<form method="POST" action="{{ url_for('ai_guard.shame_settings') }}">
+					<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+					<input type="hidden" name="action" value="texts">
+					<h6 class="mt-3">Public page</h6>
+					<div class="form-group">
+						<label for="aig-shame_title">Title</label>
+						<input id="aig-shame_title" type="text" class="form-control" name="shame_title" value="{{ settings.shame_title }}" placeholder="{{ defaults.shame_title }}">
+					</div>
+					<div class="form-group">
+						<label for="aig-shame_text">Text under the title</label>
+						<textarea id="aig-shame_text" class="form-control" rows="4" name="shame_text" placeholder="{{ defaults.shame_text }}">{{ settings.shame_text }}</textarea>
+					</div>
+
+					<h6 class="mt-4">Messages to the {{ 'team' if teams_mode else 'user' }}</h6>
+					<div class="form-group">
+						<label for="aig-shame_notice_title">Notice title</label>
+						<input id="aig-shame_notice_title" type="text" class="form-control" name="shame_notice_title" value="{{ settings.shame_notice_title }}" placeholder="{{ defaults.shame_notice_title }}">
+					</div>
+					<div class="form-group">
+						<label for="aig-shame_notice_text">Notice text</label>
+						<textarea id="aig-shame_notice_text" class="form-control" rows="4" name="shame_notice_text" placeholder="{{ defaults.shame_notice_text }}">{{ settings.shame_notice_text }}</textarea>
+						<small class="form-text text-muted">Sent when the {{ 'team' if teams_mode else 'user' }} is put on the wall of shame; changes apply to the next decisions.</small>
+					</div>
+					<div class="form-group">
+						<label for="aig-shame_blocked">Flag submission blocked</label>
+						<input id="aig-shame_blocked" type="text" class="form-control" name="shame_blocked" value="{{ settings.shame_blocked }}" placeholder="{{ defaults.shame_blocked }}">
+						<small class="form-text text-muted">Shown in the challenge window when a flag is submitted, and in the banner on every page.</small>
+					</div>
+					<button class="btn btn-primary btn-sm"><i class="fas fa-save"></i> Save</button>
+				</form>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-md-7">
+		<h5>{{ 'Teams' if teams_mode else 'Users' }} on the wall of shame</h5>
+		{% if rows %}
+		<table class="table table-striped border aig-table">
+			<thead>
+				<tr>
+					<th>{{ noun }}</th>
+					<th>Decision</th>
+					<th>Public comment</th>
+					<th></th>
+				</tr>
+			</thead>
+			<tbody>
+			{% for shame, account in rows %}
+				<tr>
+					<td><a href="{{ url_for('ai_guard.account_detail', account_id=account.id) }}"><b>{{ account.name }}</b></a></td>
+					<td class="text-nowrap">
+						<small><span data-time="{{ shame.date | isoformat }}" data-time-format="MMM D, YYYY HH:mm"></span></small>
+						{% if shame.admin %}<br><small class="text-muted">{{ shame.admin.name }}</small>{% endif %}
+					</td>
+					<td><small>{{ shame.comment or '—' }}</small></td>
+					<td class="text-right">
+						<form method="POST" class="aig-inline-form" action="{{ url_for('ai_guard.account_action', account_id=account.id) }}"
+							onsubmit="return confirm('Remove from the wall of shame? Flag submission will be allowed again; the account stays hidden from the scoreboard.')">
+							<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+							<input type="hidden" name="action" value="unshame">
+							<input type="hidden" name="next" value="{{ url_for('ai_guard.shame_admin') }}">
+							<button class="btn btn-sm btn-outline-dark" title="Remove from the wall of shame"><i class="fas fa-user-check"></i></button>
+						</form>
+					</td>
+				</tr>
+			{% endfor %}
+			</tbody>
+		</table>
+		{% else %}
+			<p class="text-muted">Nobody yet. Put a {{ 'team' if teams_mode else 'user' }} on the wall of shame with the
+			<b>Shame</b> button in its card on the
+			<a href="{{ url_for('ai_guard.board') }}">{{ 'Team' if teams_mode else 'User' }} risk</a> tab.</p>
+		{% endif %}
+	</div>
+</div>
+{% endblock %}

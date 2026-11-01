@@ -1,0 +1,96 @@
+{% extends "ai_guard/layout.html" %}
+
+{% block aig_content %}
+<div class="row">
+	<div class="col-md-4 mb-4">
+		<div class="card">
+			<div class="card-body">
+				<h5 class="card-title">Add a honeypot flag</h5>
+				<form method="POST" action="{{ url_for('ai_guard.honeypots_create') }}">
+					<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+					<div class="form-group">
+						<label for="aig-chal">Challenge</label>
+						<select id="aig-chal" name="challenge_id" class="form-control custom-select" required>
+							<option value="">— choose —</option>
+							{% for c in challenges %}
+								<option value="{{ c.id }}">{{ c.category }} / {{ c.name }}{% if c.logic == 'all' %} ("all" logic!){% endif %}</option>
+							{% endfor %}
+						</select>
+					</div>
+					<div class="form-group">
+						<label for="aig-content">Flag</label>
+						<input id="aig-content" type="text" name="content" class="form-control" placeholder="flag{...}" required autocomplete="off">
+					</div>
+					<div class="form-group">
+						<label for="aig-mode">Matching</label>
+						<select id="aig-mode" name="data" class="form-control custom-select">
+							{% for value, title in match_modes.items() %}
+								<option value="{{ value }}">{{ title }}</option>
+							{% endfor %}
+						</select>
+					</div>
+					<button class="btn btn-primary btn-block"><i class="fas fa-plus"></i> Add</button>
+				</form>
+			</div>
+		</div>
+		<p class="small text-muted mt-3">
+			A honeypot flag is a valid solution of a challenge that the organizers hid where a human is unlikely
+			to look (for example, in an instruction for LLMs in the description or in a file). It solves the
+			challenge but raises the AI risk score by <b>{{ '%.1f' | format(honeypot_weight) }}</b>
+			(the "Honeypot flag weight" setting). Submitting the same flag again is not counted.
+		</p>
+		<p class="small text-muted">
+			Honeypot flags can also be added in the challenge card (Challenges → Flags) with the <code>honeypot</code> type.
+		</p>
+	</div>
+
+	<div class="col-md-8">
+		{% if flags %}
+		<table class="table table-striped border aig-table">
+			<thead>
+				<tr>
+					<th>Challenge</th>
+					<th>Flag</th>
+					<th>Matching</th>
+					<th class="text-center">Submissions</th>
+					<th></th>
+				</tr>
+			</thead>
+			<tbody>
+			{% for f in flags %}
+				{% set c = challenge_map.get(f.challenge_id) %}
+				<tr>
+					<td>
+						{% if c %}
+							<a href="{{ url_for('admin.challenges_detail', challenge_id=c.id) }}">{{ c.name }}</a>
+							<br><small class="text-muted">{{ c.category }}</small>
+							{% if c.logic == 'all' %}<br><span class="badge badge-warning" title="The honeypot becomes a mandatory part of the solution">"all" logic</span>{% endif %}
+						{% else %}#{{ f.challenge_id }}{% endif %}
+					</td>
+					<td><code>{{ f.content }}</code></td>
+					<td><small>{{ match_modes.get(f.data or '', f.data) }}</small></td>
+					<td class="text-center">
+						{% if hits.get(f.id) %}
+							<a class="badge badge-danger" href="{{ url_for('ai_guard.events', kind='honeypot') }}">{{ hits.get(f.id) }}</a>
+						{% else %}<span class="text-muted">0</span>{% endif %}
+					</td>
+					<td class="text-right">
+						<form method="POST" class="aig-inline-form" action="{{ url_for('ai_guard.honeypots_delete', flag_id=f.id) }}"
+							onsubmit="return confirm('Delete the honeypot flag? It will no longer be a valid solution of the challenge.')">
+							<input type="hidden" name="nonce" value="{{ Session.nonce }}">
+							<button class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash-alt"></i></button>
+						</form>
+					</td>
+				</tr>
+			{% endfor %}
+			</tbody>
+		</table>
+		{% else %}
+			<div class="text-center text-muted py-5">
+				<i class="fas fa-flag fa-3x mb-3"></i>
+				<p>No honeypot flags yet.</p>
+			</div>
+		{% endif %}
+	</div>
+</div>
+{% endblock %}
